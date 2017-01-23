@@ -2,11 +2,26 @@
 from collections import deque
 import numpy as np
 import itertools as itools
+from sklearn import preprocessing
 import tensorflow as tf
 import tensorflow.python.debug as tfdbg
 
 class BadArgumentError(ValueError):
     pass
+
+""" 
+labels_batch: 1-D tensor of values N each in 0 .. total_labels - 1
+total_labels: number of different labels
+return value: one-hot tensor of shape (len(labels_batch), total_labels)
+"""
+def my_sparse_to_onehot(labels_batch, total_labels):    
+    sparse_labels = tf.reshape(labels_batch, [-1, 1])
+    derived_size = tf.shape(labels_batch)[0]
+    indices_row = tf.range(0, derived_size, 1)
+    indices = tf.reshape(indices_row, [-1, 1])
+    concated = tf.concat(1, [indices, sparse_labels]) 
+    return tf.sparse_to_dense(concated, [derived_size, total_labels], 1.0, 0.0)
+
 
 class Model:
     def __init__(self):
@@ -15,89 +30,104 @@ class Model:
     def train(self, *, data=None, max_runs, optimizer):
         if None == data: 
             """Another training round using the same model"""
-            b0_init = self.b0
-            b1_init = self.b1
-            data_len = len(self.data.wafer_counts)
         else:            
             assert not hasattr(self, "data"), "Will not load data twice in the same model"
-            data_len = len(data.wafer_counts)
-            assert iter(data.wafer_counts) is not iter(data.wafer_counts), "Need container argument"
-            if data_len < 2: raise BadArgumentError("Need 2 or more samples")
-            next_i = len(data.wafer_counts) - 1
-            if data.wafer_counts[next_i] == data.wafer_counts[0]: raise BadArgumentError("Need different wafer counts (x)")
-            """Chooose MAX"""
-            b1_init = (data.cycle_times[next_i] - data.cycle_times[0]) / (data.wafer_counts[next_i] - data.wafer_counts[0])
-            b0_init = data.cycle_times[0] - b1_init * data.wafer_counts[0]
             self.data = data
-            #b0_init = 1 
-            #b1_init = 1 
+        self.data_len = len(data.wafer_counts)
 
-        with tf.Session() as sess:
-            print("Starting round with {} inputs, b0 = {:.1f}, b1 = {:.1f}".format(data_len, b0_init, b1_init))
-            x = tf.placeholder(tf.float32, [data_len], name="x")
-            y = tf.placeholder(tf.float32, [data_len], name="y")
-            b0 = tf.Variable([b0_init], dtype=tf.float32, trainable=True, name="b0")
-            b1 = tf.Variable([b1_init], dtype=tf.float32, trainable=True, name="b1")
-            #the model
-            y = tf.add(tf.mul(x, b1), b0)
-            y_act = tf.placeholder(tf.float32, [data_len], name="y_act")
+        self.sess = tf.Session()
+        #with self.sess:
+        try:
+            #print("Starting round with {} inputs, b0 = {:.1f}, b1 = {:.1f}".format(data_len, b0_init, b1_init))
+            tool_recipe_width = data.tr_cross.width
+            self.x = tf.placeholder(tf.float32,  name="x")
+            self.y_act = tf.placeholder(tf.float32, name="y_act")
+            #self.y = tf.placeholder(tf.float32,  name="y")
+            self.tool_recipe_row = tf.placeholder(tf.int32, name="tool_recipe_row")
+
+            """input validity checking"""
+            x_shape = tf.shape(self.x)
+            y_shape = tf.shape(self.y_act)
+            tr_shape = tf.shape(self.tool_recipe_row)
+            self.assert_0 = tf.assert_equal(x_shape, y_shape, [x_shape, y_shape]) 
+            self.assert_1 = tf.assert_equal(y_shape, tr_shape, [y_shape, tr_shape])
+
+            z = tf.to_float(my_sparse_to_onehot(self.tool_recipe_row, tool_recipe_width))
+            b0 = tf.Variable(np.zeros(tool_recipe_width), dtype=tf.float32, trainable=True, name="b0")
+            b1 = tf.Variable(np.zeros(tool_recipe_width), dtype=tf.float32, trainable=True, name="b1")
+
+            """building the model"""
+            def category_x_vect(tensor, vect):
+                v_col = tf.reshape(vect, [-1, 1])
+                prod_col = tf.matmul(tensor, v_col) 
+                return tf.reshape(prod_col, [1, -1])
+            zb0 = category_x_vect(z, b0)
+            zb1 = category_x_vect(z, b1)
+            self.y = zb0 + zb1 * self.x
+
             ERROR_MIN = 1e-6
-            error = tf.sqrt(tf.clip_by_value((y - y_act) * (y - y_act), clip_value_min=ERROR_MIN, clip_value_max=1e+127))
+            error = tf.sqrt(tf.clip_by_value((self.y - self.y_act) * (self.y - self.y_act), clip_value_min=ERROR_MIN, clip_value_max=1e+127))
             #train_step = tf.train.GradientDescentOptimizer(learning_rate=precision).minimize(error)
             train_step = optimizer.minimize(error)
-            x_in = self.data.wafer_counts
-            y_in = self.data.cycle_times
             init_op = tf.global_variables_initializer()
-            sess.run(init_op)
-            feed_dict = { x: self.data.wafer_counts, y_act: self.data.cycle_times }
+            self.sess.run(init_op)
+            x_std, y_std = self._transform(self.data.wafer_counts, self.data.cycle_times)
+            feed_dict = { self.x: x_std, self.tool_recipe_row: self.data.tool_recipe, self.y_act: y_std }
 
-            #writer = tf.summary.FileWriter("log_graph", sess.graph)
-            #for value in [b0, b1, error]:
-            #    tf.summary.tensor_summary(value.op.name, value)
-            #summaries = tf.summary.merge_all()
-            
-            grad1 = tf.gradients(error, [b0])[0]
-            grad2 = tf.gradients(error, [b1])[0]
-            #out = tf.Print(error, [error])
-            fetches_in = { b0: b0, b1: b1, y: y, error: error, train_step: train_step, grad1: grad1, grad2: grad2}#, summaries: summaries}
-
+            #grad1 = tf.gradients(error, [b0])[0]
+            #grad2 = tf.gradients(error, [b1])[0]
+            fetches_arg = { "b0": b0, b1: b1, "y": self.y, error: error, train_step: train_step, zb1: zb1, 
+                            "a0": self.assert_0, "a1": self.assert_1}
             #tf.logging.set_verbosity(tf.logging.DEBUG)
-            tail = deque(itools.repeat(0, 8), maxlen=8)
-            print(error.get_shape()[0])
-            prev_err = np.zeros(error.get_shape()[0])
+            #out = tf.Print(error, [error])
             for i in range(0, max_runs):
-                fetches = sess.run(fetches_in, feed_dict)
+                fetches = self.sess.run(fetches_arg, feed_dict)
                 #writer.add_summary(fetches[summaries])
 
-                self.b0 = fetches[b0][0]
-                self.b1 = fetches[b1][0]
-                #self.err = np.mean(fetches[error])
+                self.b0 = fetches["b0"]
+                self.b1 = fetches[b1]
                 self.err = fetches[error]
-                if i % 100 == 0:
+                if i % 10 == 0:
                     print("Step {}".format(i))
                     self.print_results()
 
-                #print(fetches[grad1], fetches[grad2])
-                delta_err = np.subtract(fetches[error], prev_err)
-                prev_err = fetches[error]
-                #print(np.ma.sum(delta_err))
-
-                tail.append((self.b0, self.b1))
-                tail_extr = list(tail)[1::2]
-                if len(set(tail_extr)) == 1: #every other equals the last
-                    print("Finished by oscillation, step {}".format(i))
-                    break
-
-                if np.isnan(self.b0) or np.isnan(self.b1):
-                    raise ValueError("Variable is NaN!")
-
             if i == max_runs - 1:
                 print("Finished by {} steps".format(max_runs))
+            self.print_results()
 
-            self.y_pred = fetches[y]
+            self.y_pred = fetches["y"]
+        except Exception as e:
+            self.sess.close()
+            raise e
+            
         self.print_results()         
+        print(self.data.tr_cross)
 
     def print_results(self):
-        print(str("b0 {:.4}, b1 {:.4}, err {}").format(self.b0, self.b1, []))
+        print("b0 {} b1 {}".format(self.b0, self.b1))
+        #for x, y in zip(self.data.wafer_counts,
+
+    """Predict y values, given vector of x values and tool_recipe tuple which applies to all x"""
+    def predict(self, x_vect, tool_recipe):
+        tr_int = self.data.tr_cross.get_int(tool_recipe)
+        tr_vect = list(itools.repeat(tr_int, len(x_vect)))
+        """y_act input is dummy for this case"""
+        y_act = list(itools.repeat(0, len(x_vect)))
+        x_vect, y_act = self._transform(x_vect, y_act)
+        feed_dict = { self.x: x_vect, self.tool_recipe_row: tr_vect, self.y_act: y_act}
+        y, _, _ = self.sess.run(fetches=[self.y, self.assert_0, self.assert_1], feed_dict=feed_dict)
+        return self._inverse_y(y)[0] 
+
+    def _transform(self, x_in, y_in):
+        if not hasattr(self, "x_scaler"):
+            self.x_scaler = preprocessing.StandardScaler().fit(x_in)
+            self.y_scaler = preprocessing.StandardScaler().fit(y_in)
+        x_std = self.x_scaler.transform(x_in)
+        y_std = self.y_scaler.transform(y_in)
+        return x_std, y_std
+
+    def _inverse_y(self, y_std):
+       return self.y_scaler.inverse_transform(y_std) 
+
 
 
