@@ -15,23 +15,38 @@ from cycle_ml.application import run
 
 from cycle_ml.graph_window import GraphWindow
 
+from cycle_ml.recipe_data import RecipeData
+class DataPart(object):
+    def __init__(self, recipe_data, length):
+        self.wafer_counts = recipe_data.wafer_counts[:length]
+        self.cycle_times = recipe_data.cycle_times[:length]
+
 def showable():        
-    model = Model()
-    data = Loader.get_data(sys.argv[1])
-    data = preprocessor.get_data(data)
-    model.train(data=data, max_runs=800, optimizer=tf.train.AdamOptimizer(learning_rate=0.01))
+    loader = Loader(sys.argv[1])
+
+    data = loader.data
+    #start_idx = len(data.wafer_counts) - 20
+    start_idx = 1
+    for length in range(start_idx, len(data.wafer_counts) - 1):
+        model = Model()
+        data_p = DataPart(data, length)
+        print(data_p.wafer_counts)
+        model.train(data=data_p, max_runs=200, optimizer=tf.train.AdamOptimizer(learning_rate=0.01))
+        pred = data.wafer_counts[length + 1:length+2]
+        pred_x = pred[0]
+        y = model.predict(pred)[0]
+        check = 10 + 5 * pred_x 
+        del model
+        print("Predict {}: {}, check: {} abs.err.:{}".format(pred_x, y, check, abs(y - check)))
+        del pred_x
 
     MyDataSet = ntuple("MyDataSet", ["x", "y"])
     train = MyDataSet([], [])
-    tool_recipe = ('endura', 'rec2-10')
-    tr_int=data.tr_cross.get_int(tool_recipe)
-    for x, y, tr in zip(data.wafer_counts, data.cycle_times, data.tool_recipe):
-        if tr_int == tr:
-            train.x.append(x)
-            train.y.append(y)
+    train.x.extend(data.wafer_counts)
+    train.y.extend(data.cycle_times)
     test = MyDataSet([], [])
     test.x.extend(range(0, 30))
-    test.y.extend(model.predict(test.x, tool_recipe))
+    test.y.extend(model.predict(test.x))
     print(test.y[0], test.y[1])
     graph_data = ntuple("train", "test")
     graph_data.train = train
