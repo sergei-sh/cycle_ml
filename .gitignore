@@ -2,6 +2,8 @@
 notes/
 git_ignore/
 log_graph/
+models/
+training_data/
 *.csv#
 *.swp
 *.swo

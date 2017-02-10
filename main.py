@@ -1,49 +1,21 @@
 
 import sys
 
+import argparse
 from collections import namedtuple as ntuple
-import pyqtgraph as pg
-from PyQt4 import QtGui
 import tensorflow as tf
 
-from cycle_ml import Loader
 from cycle_ml import Model
-from cycle_ml import preprocessor
 from collections import deque
 
-from cycle_ml.application import run
+from cycle_ml.recipe_data import RecipeData, mae10
 
-from cycle_ml.graph_window import GraphWindow
-
-from cycle_ml.recipe_data import RecipeData
-class DataPart(object):
-    def __init__(self, recipe_data, length):
-        self.wafer_counts = recipe_data.wafer_counts[:length]
-        self.cycle_times = recipe_data.cycle_times[:length]
-
-def showable():        
-    loader = Loader(sys.argv[1])
-
-    data = loader.data
-    #start_idx = len(data.wafer_counts) - 20
-    start_idx = 1
-    for length in range(start_idx, len(data.wafer_counts) - 1):
-        model = Model()
-        data_p = DataPart(data, length)
-        print(data_p.wafer_counts)
-        model.train(data=data_p, max_runs=200, optimizer=tf.train.AdamOptimizer(learning_rate=0.01))
-        pred = data.wafer_counts[length + 1:length+2]
-        pred_x = pred[0]
-        y = model.predict(pred)[0]
-        check = 10 + 5 * pred_x 
-        del model
-        print("Predict {}: {}, check: {} abs.err.:{}".format(pred_x, y, check, abs(y - check)))
-        del pred_x
-
+def showable(model, rdata):        
+    print("run")
     MyDataSet = ntuple("MyDataSet", ["x", "y"])
     train = MyDataSet([], [])
-    train.x.extend(data.wafer_counts)
-    train.y.extend(data.cycle_times)
+    train.x.extend(rdata.wafer_counts)
+    train.y.extend(rdata.cycle_times)
     test = MyDataSet([], [])
     test.x.extend(range(0, 30))
     test.y.extend(model.predict(test.x))
@@ -57,11 +29,54 @@ if __name__ == "__main__":
     if (len(sys.argv) < 2):
         print("Usage: python main.py in_data.csv")
     else:
-        need_graph = (len(sys.argv) == 3 and sys.argv[2] == "-graph")
-        if need_graph:
-            run(showable)
-        else:
-            it = showable()
-            deque(it) 
+        parser = argparse.ArgumentParser()
+        #parser.add_argument("--graph", action="store_true")
+        parser.add_argument("--next_datapoint", type=int)
+        parser.add_argument("--finish_datapoint", type=float)
+        parser.add_argument("--verbose", action="store_true")
+        parser.add_argument("tool_recipe", nargs="?", default="", type=str)
+        args = parser.parse_args()
+        args.graph = 0
 
+        if not args.tool_recipe:
+            parser.print_help()
+            sys.exit("\n Need to specify tool,recipe")
+
+        elif None != args.next_datapoint or args.graph:
+            print("Loading the model...")
+            rdata = RecipeData()
+            rdata.load(args.tool_recipe) 
+            more = 2 - len(rdata)
+            rdata.wc_pending = args.next_datapoint
+            if more <= 0:
+                model = Model()
+                model.update(rdata)
+                if args.graph:
+                    from cycle_ml.application import run
+                    run(showable(model, rdata))
+                    exit(0)
+                assert args.next_datapoint > 0
+                pred = model.predict([args.next_datapoint])[0][0]
+                print("Predicted cycle time (s): {:.4f}".format(pred))
+                if args.verbose:
+                    test_pred = model.predict([0, 1])
+                    print("Predict(0): {}, Predict(1): {}".format(test_pred[0], test_pred[1]))
+                print("MAE(last 10)(s): {:.4f}".format(mae10(rdata)))
+                rdata.predicted_pending = pred
+            else:
+                print("{} more finished datapoints to start predictions".format(more))
+            rdata.save(args.tool_recipe)
+
+        elif args.finish_datapoint:
+            rdata = RecipeData()
+            rdata.load(args.tool_recipe)
+            if rdata.wc_pending:
+                print("Acquired cycle time {} for wafer count {}".format(args.finish_datapoint, rdata.wc_pending))
+                rdata.acquire_pending(args.finish_datapoint)
+                rdata.save(args.tool_recipe)
+                if args.verbose:
+                    print(rdata)
+            else:
+                sys.exit("No datapoint started currently for {}".format(args.tool_recipe))
+             
 

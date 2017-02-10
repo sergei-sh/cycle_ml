@@ -1,3 +1,3 @@
 
 from .model import Model
-from .loader import Loader
+from .recipe_data import RecipeData

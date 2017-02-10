@@ -1,0 +1,11 @@
+Installation:
+pip3 install tensorflow
+
+Usage:
+python main.py --next_datapoint 10 tool1,recipe2 (returns predicted cycle time and mean absolute error (s) for the previous 10 predictions; remembers the wafer count 10 is started on the tool/recipe) 
+python main.py --finish_datapoint 110 (signalling real cycle time occur to be 110s; ready for next datapoint) 
+python loader.py in_data.csv (uses the above 2 commands to automatically feed the contents of in_data.csv to the application)
+
+Data generator:
+cd data_gen; python generate.py 10 5 2 30 data.csv (generate points along line 10 + 5 * x, disperse with max absolute error 2, x=[1 .. 30])
+python generate.py -h (show usage)
