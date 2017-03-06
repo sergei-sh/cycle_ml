@@ -4,6 +4,8 @@ git_ignore/
 log_graph/
 models/
 training_data/
+logs/
+tboard/
 *.csv#
 *.swp
 *.swo

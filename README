@@ -1,11 +1,17 @@
 Installation:
+(install pip3)
 pip3 install tensorflow
 
 Usage:
 python main.py --next_datapoint 10 tool1,recipe2 (returns predicted cycle time and mean absolute error (s) for the previous 10 predictions; remembers the wafer count 10 is started on the tool/recipe) 
-python main.py --finish_datapoint 110 (signalling real cycle time occur to be 110s; ready for next datapoint) 
+python main.py --finish_datapoint 110 tool1,recipe2 (signalling real cycle time occur to be 110s; ready for next datapoint) 
 python loader.py in_data.csv (uses the above 2 commands to automatically feed the contents of in_data.csv to the application)
 
-Data generator:
-cd data_gen; python generate.py 10 5 2 30 data.csv (generate points along line 10 + 5 * x, disperse with max absolute error 2, x=[1 .. 30])
-python generate.py -h (show usage)
+Automated testing example:
+python generate.py --b0 20 --b1 15 --dispersion 4 --x_max 40 --tool_recipe RECIPE20_15 --csv (generate points along line 20 + 15 * x, disperse with max absolute error 4, x=[1 .. 40], output file RECIPE20_15.csv)
+python loader.py RECIPE20_15.csv (run the above points through main.py's command line interface, one-by-one as if they were coming from the tool)
+python loader_merged.py NEW_FORMAT.csv (new format loader: Tool Count Recipe CycleTime Sequence)
+
+
+The data is saved to "models" dir (need to be present). If need to restart with some tool_recipe, delete the corresponding files from "models".
+The "logs" dir (need to be present) contains tool-recipe -wise output for each datapoint prediction.

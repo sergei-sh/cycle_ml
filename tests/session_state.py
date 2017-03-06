@@ -1,5 +1,6 @@
 
 import tensorflow as tf
+import sys
 
 PATH = "test_m/model"
 
@@ -20,5 +21,5 @@ def state_graph(*, save):
             saver.restore(sess, PATH)
             print("w: ", sess.run([w])[0])
 
-#state_graph(save=True)            
-state_graph(save=False)            
+state_graph(save=True)            
+#state_graph(save=False)            
