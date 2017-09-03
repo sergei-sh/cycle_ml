@@ -24,9 +24,10 @@ with tf.Session() as sess:
     init_op = tf.global_variables_initializer()
     sess.run(init_op)
 
-    #tf.scalar_summary("mean_error", err)
-    #merged_summary_op = tf.merge_all_summaries()
-    #summary_writer = tf.train.SummaryWriter("tboard", sess.graph)
+    writer = tf.summary.FileWriter("tboard", sess.graph)
+    total_error = tf.placeholder(tf.float32, name="error")
+    tf.summary.scalar("error", total_error)
+    summaries = tf.summary.merge_all()
 
     fname = args.fname
     print("Reading {}".format(fname))
@@ -47,9 +48,10 @@ with tf.Session() as sess:
                 print("\n")
                 abs_err = my_call(["python", "main.py", "--finish_datapoint", str(ct), fname])
 
-                feed_dict = { err: abs_err }
-                #summary = sess.run([merged_summary_op], feed_dict)
-                #summary_writer.add_summary(summary[0], step)
+                print("ERROR ", abs_err)
+                feed_dict = { total_error: abs_err }
+                [summary] = sess.run([summaries], feed_dict)
+                writer.add_summary(summary, step)
                 step += 1
 
                 #print("\n")

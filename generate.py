@@ -7,20 +7,22 @@ import tensorflow as tf
 
 from cycle_ml import RecipeData
 
+from sklearn.preprocessing import StandardScaler
+
 parser = argparse.ArgumentParser()
-parser.add_argument("--b0", type=float)
-parser.add_argument("--b1", type=float)
-parser.add_argument("--dispersion", type=float)
-parser.add_argument("--x_max", type=int)
-parser.add_argument("--tool_recipe", type=str)
+parser.add_argument("b0", type=float)
+parser.add_argument("b1", type=float)
+parser.add_argument("dispersion", type=float)
+parser.add_argument("x_max", type=int)
+parser.add_argument("tool_recipe", type=str)
 parser.add_argument("--multiplicator", type=int)
-parser.add_argument("--csv", action="store_true")
+parser.add_argument("csv", action="store_true")
 parser.add_argument("--truncate", type=int)
 parser.add_argument("--no_clusters", action="store_true")
 args = parser.parse_args()
 
 """Reproducible results are desired"""
-np.random.seed(0)
+np.random.seed(1)
 
 x_max = int(args.x_max)
 counter = 0
@@ -32,21 +34,24 @@ else:
 
 x_storage = []
 y_storage = []
+#y_line = []
 def gen_points(x_s, y_s):
     """Adds another set of points to x_storage and y_storage
     Args:
         x_s: x-axis values 
         y_s: float (0 .. 1) usually and output of rand(), converted to y-value using dispersion
     """
-        y_s = np.multiply(y_s, args.dispersion * 2)
-        y_s = np.subtract(y_s, args.dispersion)
-        for x, y in zip(x_s, y_s):
-            y_line = args.b0 + args.b1 * x
-            y = y_line + y
-            global x_storage
-            global y_storage
-            x_storage.append(float(x))
-            y_storage.append(float(y))
+    y_s = np.multiply(y_s, args.dispersion * 2)
+    y_s = np.subtract(y_s, args.dispersion)
+    for x, y in zip(x_s, y_s):
+        y_line = args.b0 + args.b1 * x
+        y = y_line + y
+        global x_storage
+        global y_storage
+        #global y_line
+        x_storage.append(float(x))
+        y_storage.append(float(y))
+        #y_line.append(float(y_line))
 
 mult = args.multiplicator if args.multiplicator else 1
 for _ in range(0, mult):
@@ -75,7 +80,7 @@ print(x_storage, y_storage)
 
 if args.csv:
     class GenPoints:
-    """ Csv writer """
+        """ Csv writer """
         def __init__(self, out_fname):
             self._fname = out_fname
 
@@ -89,4 +94,6 @@ if args.csv:
 else:
     RecipeData.save(RecipeData(x_storage, y_storage, [0 for _ in range(0, len(x_storage))]), tool_recipe)
 
-print("{} points total".format(len(x_storage)))
+scaler = StandardScaler()
+scaler.fit(y_storage)
+print("{} points total, sigma: {}".format(len(x_storage), scaler.var_))
