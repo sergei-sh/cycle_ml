@@ -1,4 +1,10 @@
-"""Takes an input csv in the following format:
+""" 
+Updated: 2017
+Author: Sergei Shliakhtin
+Contact: xxx.serj@gmail.com
+Notes:
+
+Takes an input csv in the following format:
 TOOL, WAFER_COUNT, RECIPE, CYCLE_TIME, SEQUENCE_NO
 and sends it to main.py according to usual protocol (see README)
 """ 

@@ -1,10 +1,17 @@
-"""Takes an input csv in the following format:
+""" 
+Updated: 2017
+Author: Sergei Shliakhtin
+Contact: xxx.serj@gmail.com
+Notes:
+
+Takes an input csv in the following format:
 WAFER_COUNT, CYCLE_TIME
 and sends it to main.py according to usual protocol (see README),
 uses input filename as tool_recipe id;
 
 Has some (disabled) abitlity to log results to tensorboards
 """ 
+
 import argparse
 import csv
 import subprocess

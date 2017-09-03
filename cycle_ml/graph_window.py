@@ -1,3 +1,9 @@
+""" 
+Updated: 2017
+Author: Sergei Shliakhtin
+Contact: xxx.serj@gmail.com
+Notes:
+"""
 
 from PyQt4 import QtGui, QtCore
 
@@ -6,6 +12,9 @@ import pyqtgraph as pg
 import numpy as np
 
 class GraphWindow(pg.PlotWidget):
+    """Qt window to visualize train/predicted sets
+    """
+
     def __init__(self, parent, showable):
         super().__init__(parent)
         self.showable = showable

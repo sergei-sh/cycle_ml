@@ -1,4 +1,9 @@
-"""Generates either csv or tf with points distorted along a given line"""
+""" 
+Updated: 2017
+Author: Sergei Shliakhtin
+Contact: xxx.serj@gmail.com
+Notes: Generates either csv or tf with points distorted along a given line
+"""
 
 import argparse
 import numpy as np

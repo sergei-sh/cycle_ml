@@ -1,4 +1,10 @@
-"""The program entry point. See README for usage"""
+""" 
+Updated: 2017
+Author: Sergei Shliakhtin
+Contact: xxx.serj@gmail.com
+Notes:
+
+The program entry point. See README for usage"""
 
 
 import argparse

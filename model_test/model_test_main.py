@@ -1,3 +1,11 @@
+""" 
+Updated: 2017
+Author: Sergei Shliakhtin
+Contact: xxx.serj@gmail.com
+Notes:
+
+The entry point for the model_test
+"""
 
 
 import time

@@ -1,3 +1,9 @@
+""" 
+Updated: 2017
+Author: Sergei Shliakhtin
+Contact: xxx.serj@gmail.com
+Notes: Model paths and other utilites
+"""
 
 from os.path import join, isfile
 import time

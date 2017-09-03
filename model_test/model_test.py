@@ -1,3 +1,11 @@
+""" 
+Updated: 2017
+Author: Sergei Shliakhtin
+Contact: xxx.serj@gmail.com
+Notes:
+
+Research code. Produce various stats/graphs on the model developed.
+"""
 
 from collections import deque
 import random

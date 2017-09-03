@@ -1,4 +1,10 @@
-""" The main project functionality - linear regression model resides here
+""" 
+Updated: 2017
+Author: Sergei Shliakhtin
+Contact: xxx.serj@gmail.com
+Notes:
+
+ The main project functionality - linear regression model resides here
 """
 
 from collections import deque

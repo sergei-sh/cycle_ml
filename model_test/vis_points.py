@@ -1,3 +1,11 @@
+""" 
+Updated: 2017
+Author: Sergei Shliakhtin
+Contact: xxx.serj@gmail.com
+Notes:
+
+Load/display dataset points in Qt window
+"""
 from PyQt4 import QtGui
 
 import pyqtgraph as pg
